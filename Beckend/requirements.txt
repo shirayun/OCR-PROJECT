@@ -4,3 +4,4 @@ opencv-python
 pytesseract
 numpy
 pandas
+python-multipart
