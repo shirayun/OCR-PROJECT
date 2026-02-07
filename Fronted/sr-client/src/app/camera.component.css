@@ -1,0 +1,61 @@
+ .camera-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.video-wrap {
+  width: 640px;
+  max-width: 100%;
+  background: #000;
+}
+
+video#camera {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview img {
+  max-width: 320px;
+  border: 1px solid #ccc;
+}
+
+.result pre {
+  max-width: 640px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.upload-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progress-bar {
+  width: 300px;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress {
+  height: 100%;
+  background: #4caf50;
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: #333;
+}

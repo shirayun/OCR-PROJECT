@@ -1,0 +1,27 @@
+<div class="camera-container">
+  <div class="video-wrap">
+    <video id="camera" autoplay muted playsinline></video>
+    <canvas id="capture" hidden></canvas>
+  </div>
+
+  <div class="controls">
+    <button (click)="capture()">📸 Capture</button>
+    <button (click)="upload()" [disabled]="!capturedBlob || uploading">{{ uploading ? 'Uploading...' : 'Upload' }}</button>
+    <button (click)="downloadExcel()">⬇️ Download Excel</button>
+  </div>
+
+  <div *ngIf="uploading" class="upload-status">
+    <div class="progress-bar"><div class="progress" [style.width.%]="progress"></div></div>
+    <div class="progress-text">{{ progress }}% - Uploading...</div>
+  </div>
+
+  <div *ngIf="capturedBlob" class="preview">
+    <h3>Preview</h3>
+    <img [src]="previewUrl" alt="preview" id="preview-img">
+  </div>
+
+  <div *ngIf="result" class="result">
+    <h4>Result</h4>
+    <pre>{{ result }}</pre>
+  </div>
+</div>
