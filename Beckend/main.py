@@ -31,7 +31,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-SR"],
+    expose_headers=["X-SR", "Content-Disposition"],
 )
 
 # Serve Angular build properly
@@ -119,7 +119,8 @@ def download_results():
         return FileResponse(
             excel_path,
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            filename='results.xlsx'
+            filename='results.xlsx',
+            headers={"Content-Disposition": "attachment; filename=results.xlsx"}
         )
     return JSONResponse(status_code=404, content={"error": "No results file found"})
 

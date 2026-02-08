@@ -163,6 +163,10 @@ export class CameraComponent implements OnInit, OnDestroy {
   }
 
   downloadExcel() {
-    window.open(`${API_BASE_URL}/download-results`, '_blank');
+    const url = `${API_BASE_URL}/download-results`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'results.xlsx';
+    link.click();
   }
 }
