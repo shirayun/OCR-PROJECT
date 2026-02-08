@@ -1,6 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import cv2
 import pytesseract
 import re
@@ -14,6 +16,15 @@ import tempfile
 import platform
 
 app = FastAPI(title="OCR SR API", version="1.0.0")
+
+# הגשת קבצים סטטיים
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# מסלול / מחזיר את index.html
+@app.get("/")
+def serve_frontend():
+    return FileResponse("static/index.html")
+
 
 # Allow CORS from frontend during development
 # For development allow all origins to avoid CORS issues (change in production)
