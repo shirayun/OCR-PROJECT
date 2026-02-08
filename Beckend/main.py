@@ -34,10 +34,6 @@ app.add_middleware(
     expose_headers=["X-SR", "Content-Disposition"],
 )
 
-# Serve Angular build properly
-# FastAPI יראה את כל הקבצים ב־static כמו ש־Angular מצפה להם
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
-
 # Health check
 @app.get("/health")
 async def health_check():
@@ -135,3 +131,7 @@ def get_results_count():
         return {"count": 0, "last_updated": None}
     except Exception as e:
         return {"count": 0, "error": str(e)}
+
+# Serve Angular build properly - MUST BE LAST!
+# FastAPI יראה את כל הקבצים ב־static כמו ש־Angular מצפה להם
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
