@@ -20,8 +20,14 @@ app = FastAPI(title="OCR SR API", version="1.0.0")
 OUTPUT_DIR = "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# הגדרת Tesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# הגדרת Tesseract - עבור Linux (Render) pytesseract יחפש באופן אוטומטי
+# עבור Windows, צריך להתקין Tesseract מ https://github.com/UB-Mannheim/tesseract/wiki
+try:
+    import platform
+    if platform.system() == "Windows":
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+except Exception as e:
+    print(f"Note: Could not set Tesseract path: {e}")
 
 # CORS
 origins = ["*"]
