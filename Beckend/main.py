@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import cv2
@@ -7,69 +7,43 @@ import pytesseract
 import re
 import numpy as np
 import pandas as pd
-import os
 import io
 import datetime
 import traceback
-import tempfile
 import platform
 
 app = FastAPI(title="OCR SR API", version="1.0.0")
 
-# תיקיית output
-OUTPUT_DIR = "output"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# ====== STORAGE IN MEMORY ======
+results_buffer = []  # כאן נשמרות כל הסריקות
 
-# הגדרת Tesseract - עבור Linux (Render) pytesseract יחפש באופן אוטומטי
-# עבור Windows, צריך להתקין Tesseract מ https://github.com/UB-Mannheim/tesseract/wiki
+# ====== TESSERACT ======
 try:
-    import platform
     if platform.system() == "Windows":
         pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 except Exception as e:
     print(f"Note: Could not set Tesseract path: {e}")
 
-# CORS
-origins = ["*"]
+# ====== CORS ======
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-SR", "Content-Disposition"],
 )
 
-# Health check
+# ====== HEALTH ======
 @app.get("/health")
 async def health_check():
     return {
         "status": "ok",
-        "service": "OCR SR API",
-        "version": "1.0.0",
+        "stored_rows": len(results_buffer),
         "platform": platform.system(),
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
 
-# API Status
-@app.get("/api/status")
-async def api_status():
-    try:
-        test_img = np.zeros((10, 10), dtype=np.uint8)
-        pytesseract.image_to_string(test_img)
-        tesseract_ok = True
-    except Exception as e:
-        tesseract_ok = False
-        print(f"Tesseract check error: {e}")
-
-    return {
-        "backend_running": True,
-        "tesseract_available": tesseract_ok,
-        "output_dir": OUTPUT_DIR,
-        "platform": platform.system()
-    }
-
-# Scan Image
+# ====== SCAN IMAGE ======
 @app.post("/scan")
 async def scan_image(file: UploadFile = File(...)):
     try:
@@ -82,75 +56,53 @@ async def scan_image(file: UploadFile = File(...)):
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
         text = pytesseract.image_to_string(gray, config="--psm 6")
 
         match = re.search(r"\b(\d{8})\b", text)
-        code = match.group(1) if match else (re.findall(r"\d{8,9}", text)[0] if re.findall(r"\d{8,9}", text) else "NOT FOUND")
+        code = match.group(1) if match else "NOT FOUND"
 
-        excel_path = os.path.join(OUTPUT_DIR, "results.xlsx")
-        timestamp = datetime.datetime.utcnow().isoformat()
-        new_row = {"SR": code, "timestamp": timestamp}
+        results_buffer.append({
+            "SR": code,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
 
-        if os.path.exists(excel_path):
-            try:
-                existing = pd.read_excel(excel_path)
-                updated = pd.concat([existing, pd.DataFrame([new_row])], ignore_index=True)
-            except Exception:
-                updated = pd.DataFrame([new_row])
-        else:
-            updated = pd.DataFrame([new_row])
+        return {
+            "sr": code,
+            "total_scans": len(results_buffer)
+        }
 
-        # Ensure output directory exists
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        
-        # Save the excel file
-        try:
-            updated.to_excel(excel_path, index=False)
-            print(f"✓ Excel saved to: {os.path.abspath(excel_path)}")
-            print(f"✓ File exists: {os.path.exists(excel_path)}")
-        except Exception as e:
-            print(f"✗ Error saving Excel: {e}")
-            raise
-
-        return {"sr": code, "rows": len(updated)}
-
-    except HTTPException:
-        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-# Download results
+# ====== DOWNLOAD EXCEL ======
 @app.get("/download-results")
 def download_results():
-    excel_path = os.path.join(OUTPUT_DIR, "results.xlsx")
-    print(f"DEBUG: Looking for file at: {os.path.abspath(excel_path)}")
-    print(f"DEBUG: File exists: {os.path.exists(excel_path)}")
-    
-    if os.path.exists(excel_path):
-        print(f"✓ File found, sending: {excel_path}")
-        return FileResponse(
-            excel_path,
-            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            filename='results.xlsx',
-            headers={"Content-Disposition": "attachment; filename=results.xlsx"}
+    if not results_buffer:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "אין נתונים להורדה"}
         )
-    
-    print(f"✗ File NOT found at: {excel_path}")
-    return JSONResponse(status_code=404, content={"error": f"No results file found at {excel_path}"})
 
-# Count results
+    df = pd.DataFrame(results_buffer)
+
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=results.xlsx"
+        }
+    )
+
+# ====== COUNT ======
 @app.get("/api/results-count")
-def get_results_count():
-    excel_path = os.path.join(OUTPUT_DIR, "results.xlsx")
-    try:
-        if os.path.exists(excel_path):
-            df = pd.read_excel(excel_path)
-            return {"count": len(df), "last_updated": os.path.getmtime(excel_path)}
-        return {"count": 0, "last_updated": None}
-    except Exception as e:
-        return {"count": 0, "error": str(e)}
+def results_count():
+    return {"count": len(results_buffer)}
 
-# Serve Angular build properly - MUST BE LAST!
-# FastAPI יראה את כל הקבצים ב־static כמו ש־Angular מצפה להם
+# ====== STATIC (ANGULAR) ======
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
