@@ -15,7 +15,7 @@ app = FastAPI(title="OCR SR API", version="1.0.0")
 # ===== מאגר בזיכרון =====
 results_buffer: list[dict] = []
 
-# CORS
+# ===== CORS =====
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,6 +23,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ===== ROOT (חשוב!) =====
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "message": "OCR SR API is running",
+        "stored_rows": len(results_buffer),
+        "platform": platform.system()
+    }
 
 # ===== Health =====
 @app.get("/health")
