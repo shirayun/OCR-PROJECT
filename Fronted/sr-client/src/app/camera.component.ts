@@ -4,6 +4,9 @@ import { HttpClientModule, HttpClient, HttpEvent, HttpEventType } from '@angular
 import { RouterModule } from '@angular/router';
 import { timeout } from 'rxjs/operators';
 
+const API_BASE_URL = 'https://ocr-project-3-wn71.onrender.com';
+
+
 @Component({
   selector: 'app-camera',
   standalone: true,
@@ -115,7 +118,7 @@ export class CameraComponent implements OnInit, OnDestroy {
       // ensure progress shows something quickly
       this.progress = 5;
 
-      this.http.post('http://localhost:8000/scan', form, { reportProgress: true, observe: 'events' })
+      this.http.post(`${API_BASE_URL}/scan`, form, { reportProgress: true, observe: 'events' })
         .pipe(timeout(this.timeoutMs))
         .subscribe({
           next: (event: HttpEvent<any>) => {
@@ -160,6 +163,6 @@ export class CameraComponent implements OnInit, OnDestroy {
   }
 
   downloadExcel() {
-    window.open('http://localhost:8000/download-results', '_blank');
+    window.open(`${API_BASE_URL}/download-results`, '_blank');
   }
 }
