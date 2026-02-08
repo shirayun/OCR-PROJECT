@@ -10,14 +10,12 @@ import pandas as pd
 import io
 import datetime
 import platform
-import os
-import tempfile
 import traceback
 
 app = FastAPI(title="OCR SR API", version="1.0.0")
 
-# ===== Static Angular =====
-# כאן FastAPI יודע להגיש את כל קבצי האתר
+# ===== Serve Angular frontend =====
+# כל הקבצים בתוך תיקיית 'static' יוגשו כ־frontend
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 # ===== CORS =====
@@ -32,7 +30,7 @@ app.add_middleware(
 # ===== OCR Results Buffer =====
 results_buffer: list[dict] = []
 
-# ===== Health =====
+# ===== Health Endpoint =====
 @app.get("/health")
 def health():
     return {
@@ -53,26 +51,26 @@ async def scan_image(file: UploadFile = File(...)):
         if img is None:
             raise HTTPException(status_code=400, detail="Invalid image")
 
+        # עיבוד OCR
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (3, 3), 0)
         text = pytesseract.image_to_string(gray, config="--psm 6")
 
+        # חיפוש קוד SR
         match = re.search(r"\b(\d{8,9})\b", text)
         code = match.group(1) if match else "NOT FOUND"
 
+        # הוספת שורה ל־buffer
         results_buffer.append({
             "SR": code,
             "timestamp": datetime.datetime.utcnow().isoformat()
         })
 
-        return {
-            "sr": code,
-            "stored_rows": len(results_buffer)
-        }
+        return {"sr": code, "stored_rows": len(results_buffer)}
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Error processing image")
 
 # ===== Download Excel =====
 @app.get("/download-results")
