@@ -72,19 +72,26 @@ async def scan_image(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Error processing image")
 
-# ===== Download Excel =====
+# ===== Download Excel (Cloud Safe) =====
 @app.get("/download-results")
 def download_results():
     if not results_buffer:
         return JSONResponse(status_code=404, content={"error": "No scans yet"})
 
+    # יוצרים DataFrame כמו קודם
     df = pd.DataFrame(results_buffer)
+
+    # יוצרים קובץ Excel בזיכרון בלבד
     stream = io.BytesIO()
     df.to_excel(stream, index=False)
-    stream.seek(0)
+    stream.seek(0)  # חובה כדי שהדפדפן יקבל את כל הנתונים
 
+    # שולחים כ־blob ישירות לדפדפן
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=results.xlsx"}
+        headers={
+            "Content-Disposition": "attachment; filename=results.xlsx",
+            "Content-Length": str(len(stream.getvalue()))
+        }
     )
