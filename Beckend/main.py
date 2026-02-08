@@ -94,10 +94,17 @@ async def scan_image(file: UploadFile = File(...)):
         else:
             updated = pd.DataFrame([new_row])
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tf:
-            temp_path = tf.name
-        updated.to_excel(temp_path, index=False)
-        os.replace(temp_path, excel_path)
+        # Ensure output directory exists
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        
+        # Save the excel file
+        try:
+            updated.to_excel(excel_path, index=False)
+            print(f"✓ Excel saved to: {os.path.abspath(excel_path)}")
+            print(f"✓ File exists: {os.path.exists(excel_path)}")
+        except Exception as e:
+            print(f"✗ Error saving Excel: {e}")
+            raise
 
         return {"sr": code, "rows": len(updated)}
 
@@ -111,14 +118,20 @@ async def scan_image(file: UploadFile = File(...)):
 @app.get("/download-results")
 def download_results():
     excel_path = os.path.join(OUTPUT_DIR, "results.xlsx")
+    print(f"DEBUG: Looking for file at: {os.path.abspath(excel_path)}")
+    print(f"DEBUG: File exists: {os.path.exists(excel_path)}")
+    
     if os.path.exists(excel_path):
+        print(f"✓ File found, sending: {excel_path}")
         return FileResponse(
             excel_path,
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             filename='results.xlsx',
             headers={"Content-Disposition": "attachment; filename=results.xlsx"}
         )
-    return JSONResponse(status_code=404, content={"error": "No results file found"})
+    
+    print(f"✗ File NOT found at: {excel_path}")
+    return JSONResponse(status_code=404, content={"error": f"No results file found at {excel_path}"})
 
 # Count results
 @app.get("/api/results-count")
