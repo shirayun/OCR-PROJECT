@@ -59,8 +59,10 @@ export class CameraComponent implements OnInit, OnDestroy {
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.startCamera();
+  this.createSessionIfNeeded();
+  this.startCamera();
   }
+
 
   ngOnDestroy() {
     this.stopCamera();
@@ -68,6 +70,18 @@ export class CameraComponent implements OnInit, OnDestroy {
       URL.revokeObjectURL(this.previewUrl);
     }
   }
+
+  createSessionIfNeeded() {
+  let session = localStorage.getItem('session_id');
+
+  if (!session) {
+    this.http.get<any>(`${API_BASE_URL}/session`)
+      .subscribe(res => {
+        localStorage.setItem('session_id', res.session_id);
+      });
+  }
+}
+
 
   async startCamera() {
     try {
@@ -106,6 +120,14 @@ export class CameraComponent implements OnInit, OnDestroy {
   }
 
   upload() {
+
+    const sessionId = localStorage.getItem('session_id');
+    if (!sessionId) {
+      this.result = 'המערכת עדיין נטענת, נסי שוב בעוד רגע';
+      this.uploading = false;
+      return;
+    }
+
     if (!this.capturedBlob) return;
     this.uploading = true;
     this.progress = 0;
@@ -118,7 +140,13 @@ export class CameraComponent implements OnInit, OnDestroy {
       // ensure progress shows something quickly
       this.progress = 5;
 
-      this.http.post(`${API_BASE_URL}/scan`, form, { reportProgress: true, observe: 'events' })
+      const sessionId = localStorage.getItem('session_id');
+      this.http.post(
+        `${API_BASE_URL}/scan?session_id=${sessionId}`,
+        form,
+        { reportProgress: true, observe: 'events' }
+      )
+
         .pipe(timeout(this.timeoutMs))
         .subscribe({
           next: (event: HttpEvent<any>) => {
@@ -163,10 +191,20 @@ export class CameraComponent implements OnInit, OnDestroy {
   }
 
   downloadExcel() {
-    const url = `${API_BASE_URL}/download-results`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'results.xlsx';
-    link.click();
-  }
+    const sessionId = localStorage.getItem('session_id');
+    this.http.get(
+      `${API_BASE_URL}/download-results?session_id=${sessionId}`,
+      { responseType: 'blob' }
+    ).subscribe(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'results.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
 }
+
+}
+
+

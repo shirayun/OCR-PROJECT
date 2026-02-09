@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from uuid import uuid4
 import cv2
 import pytesseract
 import re
@@ -27,71 +28,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===== OCR Results Buffer =====
-results_buffer: list[dict] = []
+results_by_session: dict[str, list[dict]] = {}
 
-# ===== Health Endpoint =====
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "stored_rows": len(results_buffer),
-        "platform": platform.system(),
+@app.get("/session")
+def create_session():
+    session_id = str(uuid4())
+    results_by_session[session_id] = []
+    return {"session_id": session_id}
+
+@app.post("/scan")
+async def scan_image(
+    session_id: str,
+    file: UploadFile = File(...)
+):
+    if session_id not in results_by_session:
+        raise HTTPException(status_code=400, detail="Invalid session")
+
+    contents = await file.read()
+    np_img = np.frombuffer(contents, np.uint8)
+    img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+
+    if img is None:
+        raise HTTPException(status_code=400, detail="Invalid image")
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    text = pytesseract.image_to_string(gray, config="--psm 6")
+
+    match = re.search(r"\b(\d{8,9})\b", text)
+    code = match.group(1) if match else "NOT FOUND"
+
+    results_by_session[session_id].append({
+        "SR": code,
         "timestamp": datetime.datetime.utcnow().isoformat()
+    })
+
+    return {
+        "sr": code,
+        "rows": len(results_by_session[session_id])
     }
 
-# ===== Scan Endpoint =====
-@app.post("/scan")
-async def scan_image(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        np_img = np.frombuffer(contents, np.uint8)
-        img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
-
-        if img is None:
-            raise HTTPException(status_code=400, detail="Invalid image")
-
-        # עיבוד OCR
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (3, 3), 0)
-        text = pytesseract.image_to_string(gray, config="--psm 6")
-
-        # חיפוש קוד SR
-        match = re.search(r"\b(\d{8,9})\b", text)
-        code = match.group(1) if match else "NOT FOUND"
-
-        # הוספת שורה ל־buffer
-        results_buffer.append({
-            "SR": code,
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        })
-
-        return {"sr": code, "stored_rows": len(results_buffer)}
-
-    except Exception:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Error processing image")
-
-# ===== Download Excel (Cloud Safe) =====
 @app.get("/download-results")
-def download_results():
-    if not results_buffer:
-        return JSONResponse(status_code=404, content={"error": "No scans yet"})
+def download_results(session_id: str):
+    if session_id not in results_by_session:
+        raise HTTPException(status_code=400, detail="Invalid session")
 
-    # יוצרים DataFrame כמו קודם
-    df = pd.DataFrame(results_buffer)
+    data = results_by_session[session_id]
 
-    # יוצרים קובץ Excel בזיכרון בלבד
+    if not data:
+        raise HTTPException(status_code=404, detail="No scans yet")
+
+    df = pd.DataFrame(data)
+
     stream = io.BytesIO()
     df.to_excel(stream, index=False)
-    stream.seek(0)  # חובה כדי שהדפדפן יקבל את כל הנתונים
+    stream.seek(0)
 
-    # שולחים כ־blob ישירות לדפדפן
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": "attachment; filename=results.xlsx",
-            "Content-Length": str(len(stream.getvalue()))
+            "Content-Disposition": "attachment; filename=results.xlsx"
         }
     )
