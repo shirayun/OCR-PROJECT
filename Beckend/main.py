@@ -47,25 +47,40 @@ async def scan_image(session_id: str, file: UploadFile = File(...)):
         if img is None:
             raise HTTPException(status_code=400, detail="Invalid image")
 
-        # Preprocessing
+        # Try multiple preprocessing methods
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-        gray = cv2.medianBlur(gray, 3)
+        
+        # Method 1: OTSU threshold
+        _, thresh1 = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # Method 2: Adaptive threshold
+        thresh2 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        
+        # Method 3: Simple threshold
+        _, thresh3 = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
 
-        # OCR - Only digits
-        text = pytesseract.image_to_string(
-            gray,
-            lang="eng",
-            config="--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789"
-        )
-
-        print("===== OCR TEXT =====")
-        print(text)
-        print("====================")
-
-        # Extract EXACTLY 8 digits
-        match = re.search(r"\b(\d{8})\b", text)
-        code = match.group(1) if match else "NOT FOUND"
+        all_codes = []
+        
+        # Try OCR on all methods
+        for idx, img_processed in enumerate([gray, thresh1, thresh2, thresh3]):
+            text = pytesseract.image_to_string(
+                img_processed,
+                lang="eng",
+                config="--oem 3 --psm 6"
+            )
+            
+            print(f"===== OCR Method {idx+1} =====")
+            print(text)
+            print("====================")
+            
+            # Find all 8-digit sequences
+            matches = re.findall(r"\d{8}", text)
+            all_codes.extend(matches)
+        
+        # Get first valid code or NOT FOUND
+        code = all_codes[0] if all_codes else "NOT FOUND"
+        
+        print(f"===== FINAL CODE: {code} =====")
 
         results_by_session[session_id].append({
             "SR": code,
