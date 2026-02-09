@@ -37,35 +37,41 @@ def create_session():
     return {"session_id": session_id}
 
 @app.post("/scan")
-async def scan_image(
-    session_id: str,
-    file: UploadFile = File(...)
-):
+async def scan_image(session_id: str, file: UploadFile = File(...)):
+    import traceback
+
     if session_id not in results_by_session:
         raise HTTPException(status_code=400, detail="Invalid session")
 
-    contents = await file.read()
-    np_img = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+    try:
+        contents = await file.read()
+        np_img = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
 
-    if img is None:
-        raise HTTPException(status_code=400, detail="Invalid image")
+        if img is None:
+            raise HTTPException(status_code=400, detail="Invalid image: could not decode")
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    text = pytesseract.image_to_string(gray, config="--psm 6")
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        text = pytesseract.image_to_string(gray, config="--psm 6")
 
-    match = re.search(r"\b(\d{8,9})\b", text)
-    code = match.group(1) if match else "NOT FOUND"
+        match = re.search(r"\b(\d{8,9})\b", text)
+        code = match.group(1) if match else "NOT FOUND"
 
-    results_by_session[session_id].append({
-        "SR": code,
-        "timestamp": datetime.datetime.utcnow().isoformat()
-    })
+        results_by_session[session_id].append({
+            "SR": code,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        })
 
-    return {
-        "sr": code,
-        "rows": len(results_by_session[session_id])
-    }
+        return {
+            "sr": code,
+            "rows": len(results_by_session[session_id])
+        }
+
+    except Exception as e:
+        print("===== ERROR in scan_image =====")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 
 @app.get("/download-results")
 def download_results(session_id: str):
