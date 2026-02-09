@@ -17,7 +17,7 @@ app = FastAPI(title="OCR SR API", version="1.0.0")
 
 # ===== Serve Angular frontend =====
 # כל הקבצים בתוך תיקיית 'static' יוגשו כ־frontend
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/app", StaticFiles(directory="static", html=True), name="static")
 
 # ===== CORS =====
 app.add_middleware(
