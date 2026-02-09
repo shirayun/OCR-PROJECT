@@ -26,13 +26,13 @@ app.add_middleware(
 
 results_by_session: dict[str, list[dict]] = {}
 
-@app.get("/session")
+@app.get("/api/session")
 def create_session():
     session_id = str(uuid4())
     results_by_session[session_id] = []
     return {"session_id": session_id}
 
-@app.post("/scan")
+@app.post("/api/scan")
 async def scan_image(session_id: str, file: UploadFile = File(...)):
     import traceback
 
@@ -69,7 +69,7 @@ async def scan_image(session_id: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/download-results")
+@app.get("/api/download-results")
 def download_results(session_id: str):
     if session_id not in results_by_session:
         raise HTTPException(status_code=400, detail="Invalid session")
