@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from uuid import uuid4
@@ -15,10 +15,6 @@ import traceback
 
 app = FastAPI(title="OCR SR API", version="1.0.0")
 
-# ===== Serve Angular frontend =====
-# כל הקבצים בתוך תיקיית 'static' יוגשו כ־frontend
-app.mount("/app", StaticFiles(directory="static", html=True), name="static")
-
 # ===== CORS =====
 app.add_middleware(
     CORSMiddleware,
@@ -29,11 +25,6 @@ app.add_middleware(
 )
 
 results_by_session: dict[str, list[dict]] = {}
-from fastapi.responses import RedirectResponse
-
-@app.get("/")
-def root():
-    return RedirectResponse("/app")
 
 @app.get("/session")
 def create_session():
@@ -101,3 +92,14 @@ def download_results(session_id: str):
             "Content-Disposition": "attachment; filename=results.xlsx"
         }
     )
+
+# ===== Serve Angular frontend - MUST BE LAST! =====
+app.mount("/app", StaticFiles(directory="static", html=True), name="static")
+
+@app.get("/")
+def root():
+    return RedirectResponse("/app")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
