@@ -168,8 +168,11 @@ export class CameraComponent implements OnInit, OnDestroy {
           },
           error: (err: any) => {
             console.error(err);
-            // handle network/CORS error
-            if (err?.name === 'TimeoutError') {
+            // If session invalid, create new one
+            if (err?.status === 400 && err?.error?.detail === 'Invalid session') {
+              localStorage.removeItem('session_id');
+              this.result = 'Session expired. רענני את הדף ונסי שוב.';
+            } else if (err?.name === 'TimeoutError') {
               this.result = 'הבקשה התנתקה — חצית את זמן ההמתנה (30s). נסי שוב או בדקי חיבור רשת.';
             } else if (err?.status === 0) {
               this.result = 'שגיאת רשת או CORS — בדקי שהשרת רץ ושה‑CORS מוגדר נכון';

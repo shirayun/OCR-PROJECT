@@ -1,9 +1,6 @@
 services:
   - type: web
     name: ocr-project
-    env: docker
-    dockerfilePath: Dockerfile
-    startCommand: ""
-    routes:
-      - path: /
-        dest: /
+    runtime: docker
+    dockerfilePath: ./Beckend/Dockerfile
+    dockerContext: ./Beckend
