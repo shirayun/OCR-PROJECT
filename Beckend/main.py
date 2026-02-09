@@ -29,6 +29,11 @@ app.add_middleware(
 )
 
 results_by_session: dict[str, list[dict]] = {}
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+def root():
+    return RedirectResponse("/app")
 
 @app.get("/session")
 def create_session():
