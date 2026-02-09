@@ -4,7 +4,7 @@ import { HttpClientModule, HttpClient, HttpEvent, HttpEventType } from '@angular
 import { RouterModule } from '@angular/router';
 import { timeout } from 'rxjs/operators';
 
-const API_BASE_URL = 'https://ocr-project-3-wn71.onrender.com';
+const API_BASE_URL = '';
 
 
 @Component({

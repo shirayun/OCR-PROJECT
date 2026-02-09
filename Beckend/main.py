@@ -94,11 +94,7 @@ def download_results(session_id: str):
     )
 
 # ===== Serve Angular frontend - MUST BE LAST! =====
-app.mount("/app", StaticFiles(directory="static", html=True), name="static")
-
-@app.get("/")
-def root():
-    return RedirectResponse("/app")
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
