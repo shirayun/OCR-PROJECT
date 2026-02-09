@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -95,6 +95,13 @@ def download_results(session_id: str):
 
 # ===== Serve Angular frontend - MUST BE LAST! =====
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, __exc):
+    # For Angular routes - return index.html
+    if not request.url.path.startswith("/api/"):
+        return FileResponse("static/index.html")
+    raise __exc
 
 if __name__ == "__main__":
     import uvicorn
