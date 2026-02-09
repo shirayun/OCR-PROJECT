@@ -35,8 +35,9 @@ def create_session():
 @app.post("/api/scan")
 async def scan_image(session_id: str, file: UploadFile = File(...)):
 
+    # Auto-create session if invalid
     if session_id not in results_by_session:
-        raise HTTPException(status_code=400, detail="Invalid session")
+        results_by_session[session_id] = []
 
     try:
         contents = await file.read()
@@ -51,19 +52,19 @@ async def scan_image(session_id: str, file: UploadFile = File(...)):
         gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
         gray = cv2.medianBlur(gray, 3)
 
-        # OCR - English only, SR + digits
+        # OCR - Only digits
         text = pytesseract.image_to_string(
             gray,
             lang="eng",
-            config="--oem 3 --psm 6 -c tessedit_char_whitelist=SR0123456789"
+            config="--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789"
         )
 
         print("===== OCR TEXT =====")
         print(text)
         print("====================")
 
-        # Extract SR + 8 digits
-        match = re.search(r"S\s*R\D*(\d{8})", text, re.IGNORECASE)
+        # Extract EXACTLY 8 digits
+        match = re.search(r"\b(\d{8})\b", text)
         code = match.group(1) if match else "NOT FOUND"
 
         results_by_session[session_id].append({
@@ -84,8 +85,9 @@ async def scan_image(session_id: str, file: UploadFile = File(...)):
 
 @app.get("/api/download-results")
 def download_results(session_id: str):
+    # Auto-create session if invalid
     if session_id not in results_by_session:
-        raise HTTPException(status_code=400, detail="Invalid session")
+        results_by_session[session_id] = []
 
     data = results_by_session[session_id]
 
