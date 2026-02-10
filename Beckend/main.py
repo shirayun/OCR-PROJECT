@@ -61,7 +61,7 @@ async def scan_image(session_id: str, file: UploadFile = File(...)):
 
         all_codes = []
         
-        # Try OCR on all methods
+        # Try OCR on all methods - stop when found
         for idx, img_processed in enumerate([gray, thresh1, thresh2, thresh3]):
             text = pytesseract.image_to_string(
                 img_processed,
@@ -75,7 +75,9 @@ async def scan_image(session_id: str, file: UploadFile = File(...)):
             
             # Find all 8-digit sequences
             matches = re.findall(r"\d{8}", text)
-            all_codes.extend(matches)
+            if matches:
+                all_codes.extend(matches)
+                break  # Stop when found!
         
         # Get first valid code or NOT FOUND
         code = all_codes[0] if all_codes else "NOT FOUND"
